@@ -136,21 +136,28 @@ const SUGGESTED_REWARDS=[
 ];
 
 const PRESET_MEALS=[
-  {name:"Chicken Sandwich",calories:470,protein:43,sodium:450,fiber:3},
-  {name:"3 Eggs + Toast + Dal",calories:520,protein:33,sodium:300,fiber:6},
-  {name:"Paneer Bhurji + 3 Roti",calories:720,protein:36,sodium:500,fiber:5},
-  {name:"Dal + 2 Roti + Dahi",calories:480,protein:22,sodium:350,fiber:7},
-  {name:"Protein Pasta",calories:440,protein:26,sodium:300,fiber:8},
-  {name:"Omelette Wrap",calories:380,protein:22,sodium:250,fiber:3},
+  // Breads & grains
+  {name:"1 Roti",calories:70,protein:2,sodium:5,fiber:1},
+  {name:"1 Cup Rice",calories:200,protein:4,sodium:0,fiber:0},
+  {name:"1 Slice Bread",calories:80,protein:3,sodium:130,fiber:1},
+  {name:"1 Paratha",calories:160,protein:3,sodium:10,fiber:2},
+  // Protein
+  {name:"1 Egg",calories:70,protein:6,sodium:70,fiber:0},
   {name:"Diesel Shake",calories:120,protein:25,sodium:53,fiber:2},
-  {name:"Soya Chunks Gravy",calories:490,protein:37,sodium:400,fiber:9},
-  {name:"Aalu Gajar + Roti",calories:530,protein:15,sodium:350,fiber:6},
-  {name:"PB Toast x2",calories:355,protein:15,sodium:180,fiber:4},
-  {name:"Rice + Dal + Dahi",calories:450,protein:19,sodium:300,fiber:5},
-  {name:"Egg Bhurji + 3 Roti",calories:620,protein:30,sodium:420,fiber:4},
+  {name:"100g Chicken",calories:165,protein:31,sodium:75,fiber:0},
+  {name:"100g Paneer",calories:265,protein:18,sodium:30,fiber:0},
+  // Dal & sabzi
+  {name:"1 Katori Dal",calories:130,protein:9,sodium:250,fiber:5},
+  {name:"1 Katori Sabzi",calories:80,protein:3,sodium:200,fiber:3},
+  {name:"1 Katori Dahi",calories:60,protein:4,sodium:40,fiber:0},
+  {name:"1 Katori Bhurji",calories:140,protein:10,sodium:220,fiber:1},
+  // Snacks & extras
   {name:"Banana",calories:90,protein:1,sodium:0,fiber:3},
-  {name:"Greek Yogurt Bowl",calories:270,protein:42,sodium:120,fiber:1},
-  {name:"Moong Dal Snack",calories:135,protein:8,sodium:350,fiber:5},
+  {name:"PB Toast",calories:180,protein:7,sodium:90,fiber:2},
+  {name:"1 Glass Milk",calories:120,protein:6,sodium:100,fiber:0},
+  {name:"Handful Almonds",calories:160,protein:6,sodium:0,fiber:2},
+  {name:"1 Katori Soya",calories:110,protein:12,sodium:200,fiber:3},
+  {name:"Greek Yogurt",calories:130,protein:20,sodium:60,fiber:0},
 ];
 
 const HOME_EXERCISES=[
@@ -227,7 +234,7 @@ export default function FitnessTracker(){
     selectedMissions:[],missionDate:null,realLifeChallenges:[],
     customRewards:[],claimedRewards:{},totalVolume:0,personalTrackers:{},weeklyReports:{},monthlyReports:{},
     sessionHistory:[],
-    customPresets:[],hiddenPresets:[],
+    customPresets:[],deletedPresets:[],
     calSettings:{maintenance:2200,deficit:500},
   });
   const [tab,setTab]=useState("dashboard");
@@ -861,7 +868,7 @@ export default function FitnessTracker(){
                 {!customMeal?(
                   <div>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
-                      <div style={mutedText}>{PRESET_MEALS.length+(data.customPresets||[]).length}/20 presets</div>
+                      <div style={mutedText}>{PRESET_MEALS.filter(m=>!(data.deletedPresets||[]).includes(m.name)).length+(data.customPresets||[]).length}/20 presets</div>
                       <button onClick={()=>setPresetEditMode(!presetEditMode)} style={{background:presetEditMode?ACCENT.protein+"22":"none",border:`2px solid ${presetEditMode?ACCENT.protein:T.border}`,borderRadius:"6px",color:presetEditMode?ACCENT.protein:T.muted,fontSize:"9px",cursor:"pointer",padding:"3px 10px",fontFamily:"monospace",fontWeight:"bold"}}>
                         {presetEditMode?"✓ DONE":"✏️ EDIT"}
                       </button>
@@ -870,7 +877,7 @@ export default function FitnessTracker(){
                       <div style={{...mutedText,marginBottom:"8px",color:ACCENT.protein,fontWeight:"bold"}}>Tap × next to any preset to remove it. Built-ins can be re-added by saving as custom.</div>
                     )}
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px"}}>
-                      {[...PRESET_MEALS.filter(m=>!(data.hiddenPresets||[]).includes(m.name)),...(data.customPresets||[])].map((m,i)=>{
+                      {[...PRESET_MEALS.filter(m=>!(data.deletedPresets||[]).includes(m.name)),...(data.customPresets||[])].map((m,i)=>{
                         const isCustom=i>=PRESET_MEALS.length;
                         return(
                           <div key={i} style={{position:"relative"}}>
@@ -889,7 +896,7 @@ export default function FitnessTracker(){
                                   const ci=i-PRESET_MEALS.length;
                                   setData(prev=>({...prev,customPresets:(prev.customPresets||[]).filter((_,idx)=>idx!==ci)}));
                                 } else {
-                                  setData(prev=>({...prev,hiddenPresets:[...(prev.hiddenPresets||[]),m.name]}));
+                                  setData(prev=>({...prev,deletedPresets:[...(prev.deletedPresets||[]),m.name]}));
                                 }
                                 showNotif("🗑️ Preset hidden");
                               }} style={{position:"absolute",top:"-6px",right:"-6px",width:"22px",height:"22px",borderRadius:"50%",background:ACCENT.protein,border:"none",color:"#000",fontSize:"13px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:"bold",lineHeight:1,zIndex:10}}>×</button>
@@ -911,7 +918,7 @@ export default function FitnessTracker(){
                     <div onClick={()=>setMealInput(p=>({...p,saveAsPreset:!p.saveAsPreset}))} style={{display:"flex",alignItems:"center",gap:"8px",marginTop:"10px",cursor:"pointer",padding:"8px 10px",borderRadius:"8px",background:mealInput.saveAsPreset?ACCENT.protein+"11":T.sub,border:`2px solid ${mealInput.saveAsPreset?ACCENT.protein+"66":T.border}`}}>
                       <div style={{width:"18px",height:"18px",borderRadius:"4px",background:mealInput.saveAsPreset?ACCENT.protein:"transparent",border:`2px solid ${mealInput.saveAsPreset?ACCENT.protein:T.muted}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"11px",fontWeight:"bold",color:"#000",flexShrink:0}}>{mealInput.saveAsPreset?"✓":""}</div>
                       <span style={{fontSize:"11px",color:mealInput.saveAsPreset?ACCENT.protein:T.muted,fontWeight:"bold"}}>Save as preset ★</span>
-                      {(PRESET_MEALS.length+(data.customPresets||[]).length)>=20&&<span style={{fontSize:"9px",color:ACCENT.protein}}>(limit reached)</span>}
+                      {(PRESET_MEALS.filter(m=>!(data.deletedPresets||[]).includes(m.name)).length+(data.customPresets||[]).length)>=20&&<span style={{fontSize:"9px",color:ACCENT.protein}}>(limit reached)</span>}
                     </div>
                     <button onClick={()=>{
                       if(!mealInput.name||!mealInput.calories) return;
