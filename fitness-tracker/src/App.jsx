@@ -262,6 +262,8 @@ export default function FitnessTracker(){
   const [questsTab,setQuestsTab]=useState("missions");
   const [newChallenge,setNewChallenge]=useState({title:"",reward:"",days:30});
   const [showNewChallenge,setShowNewChallenge]=useState(false);
+  const [presetEditMode,setPresetEditMode]=useState(false);
+  const [confirmReset,setConfirmReset]=useState(false);
   const [cardioInput,setCardioInput]=useState({type:"Walk",duration:"",calories:""});
   const [routineChecks,setRoutineChecks]=useState({});
   const [measureInput,setMeasureInput]=useState({waist:"",chest:"",arms:""});
@@ -794,6 +796,25 @@ export default function FitnessTracker(){
             </button>
           )}
 
+          {/* RESET TODAY */}
+          {!confirmReset?(
+            <button onClick={()=>setConfirmReset(true)} style={{width:"100%",padding:"8px",background:"transparent",border:`1px solid ${T.border}`,borderRadius:"8px",marginBottom:"10px",color:T.muted,fontSize:"10px",cursor:"pointer",letterSpacing:"1px",fontFamily:"monospace"}}>
+              🗑️ RESET TODAY'S DATA
+            </button>
+          ):(
+            <div style={{...cStyle,border:`2px solid ${ACCENT.protein}44`,marginBottom:"10px",textAlign:"center"}}>
+              <div style={{fontSize:"12px",fontWeight:"bold",color:ACCENT.protein,marginBottom:"10px"}}>⚠️ Reset all of today's logged data?</div>
+              <div style={{display:"flex",gap:"8px"}}>
+                <button onClick={()=>{
+                  setData(prev=>({...prev,logs:{...prev.logs,[today]:{calories:0,protein:0,sodium:0,fiber:0,steps:0,gym:false,homeGym:false,meals:[],water:0,sleep:0,mood:0,hr:0,notes:"",cardioSessions:[],supplements:[],routine:[]}}}));
+                  setConfirmReset(false);
+                  showNotif("🗑️ Today reset");
+                }} style={{flex:1,padding:"10px",background:ACCENT.protein,border:"none",borderRadius:"7px",color:"#000",fontSize:"11px",fontWeight:"bold",cursor:"pointer",fontFamily:"monospace"}}>YES, RESET</button>
+                <button onClick={()=>setConfirmReset(false)} style={{flex:1,padding:"10px",background:"none",border:`2px solid ${T.border}`,borderRadius:"7px",color:T.muted,fontSize:"11px",fontWeight:"bold",cursor:"pointer",fontFamily:"monospace"}}>CANCEL</button>
+              </div>
+            </div>
+          )}
+
           {/* Today meals */}
           {todayLog.meals?.length>0&&(
             <div>
@@ -839,13 +860,23 @@ export default function FitnessTracker(){
                 </div>
                 {!customMeal?(
                   <div>
-                    <div style={{...mutedText,marginBottom:"8px"}}>{PRESET_MEALS.length + (data.customPresets||[]).length}/20 presets · Long press to delete custom</div>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
+                      <div style={mutedText}>{PRESET_MEALS.length+(data.customPresets||[]).length}/20 presets</div>
+                      {(data.customPresets||[]).length>0&&(
+                        <button onClick={()=>setPresetEditMode(!presetEditMode)} style={{background:presetEditMode?ACCENT.protein+"22":"none",border:`2px solid ${presetEditMode?ACCENT.protein:T.border}`,borderRadius:"6px",color:presetEditMode?ACCENT.protein:T.muted,fontSize:"9px",cursor:"pointer",padding:"3px 10px",fontFamily:"monospace",fontWeight:"bold"}}>
+                          {presetEditMode?"DONE":"EDIT"}
+                        </button>
+                      )}
+                    </div>
+                    {presetEditMode&&(
+                      <div style={{...mutedText,marginBottom:"8px",color:ACCENT.protein,fontWeight:"bold"}}>Tap × to delete custom presets (★)</div>
+                    )}
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px"}}>
                       {[...PRESET_MEALS,...(data.customPresets||[])].map((m,i)=>{
                         const isCustom=i>=PRESET_MEALS.length;
                         return(
                           <div key={i} style={{position:"relative"}}>
-                            <button onClick={()=>addMeal(m)} style={{width:"100%",background:isCustom?ACCENT.protein+"11":T.sub,border:`2px solid ${isCustom?ACCENT.protein+"44":T.border}`,borderRadius:"8px",padding:"10px 8px",cursor:"pointer",textAlign:"left",fontFamily:"monospace",color:T.text}}>
+                            <button onClick={()=>{if(!presetEditMode)addMeal(m);}} style={{width:"100%",background:isCustom?ACCENT.protein+"11":T.sub,border:`2px solid ${isCustom?(presetEditMode?ACCENT.protein:ACCENT.protein+"44"):T.border}`,borderRadius:"8px",padding:"10px 8px",cursor:presetEditMode?"default":"pointer",textAlign:"left",fontFamily:"monospace",color:T.text,opacity:presetEditMode&&!isCustom?0.5:1}}>
                               <div style={{fontSize:"11px",marginBottom:"3px",fontWeight:isLight?"700":"500"}}>{m.name}{isCustom&&<span style={{color:ACCENT.protein,fontSize:"8px"}}> ★</span>}</div>
                               <div style={{fontSize:"9px"}}>
                                 <span style={{color:ACCENT.cal,fontWeight:"bold"}}>{m.calories}</span>
@@ -854,12 +885,12 @@ export default function FitnessTracker(){
                                 {m.fiber>0&&<><span style={{color:T.muted}}> · </span><span style={{color:ACCENT.fiber,fontWeight:"bold"}}>{m.fiber}f</span></>}
                               </div>
                             </button>
-                            {isCustom&&(
+                            {isCustom&&presetEditMode&&(
                               <button onClick={()=>{
                                 const ci=i-PRESET_MEALS.length;
                                 setData(prev=>({...prev,customPresets:(prev.customPresets||[]).filter((_,idx)=>idx!==ci)}));
                                 showNotif("🗑️ Preset removed");
-                              }} style={{position:"absolute",top:"-6px",right:"-6px",width:"18px",height:"18px",borderRadius:"50%",background:ACCENT.protein,border:"none",color:"#000",fontSize:"10px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:"bold",lineHeight:1}}>×</button>
+                              }} style={{position:"absolute",top:"-6px",right:"-6px",width:"22px",height:"22px",borderRadius:"50%",background:ACCENT.protein,border:"none",color:"#000",fontSize:"13px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:"bold",lineHeight:1,zIndex:10}}>×</button>
                             )}
                           </div>
                         );
@@ -1271,14 +1302,15 @@ export default function FitnessTracker(){
           {/* ACTIVE SESSION */}
           {gymView==="session"&&activeSession&&(
             <div>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"12px"}}>
-                <div>
-                  <div style={{fontSize:"16px",fontWeight:"bold",color:WORKOUT_PLANS[activeSession.planKey].color}}>
-                    {WORKOUT_PLANS[activeSession.planKey].emoji} {activeSession.planName}
-                  </div>
-                  <div style={mutedText}>{Math.round((Date.now()-activeSession.startTime)/60000)} min in · {activeSession.exercises.filter(e=>e.sets.length>0).length}/{activeSession.exercises.length} done</div>
-                </div>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
+                <button onClick={()=>{if(window.confirm("Abandon this session? Progress will be lost.")){setActiveSession(null);setSessionNote("");setSetLogInput({});setGymView("home");}}} style={{background:"none",border:`2px solid ${T.border}`,borderRadius:"7px",color:T.muted,fontSize:"11px",cursor:"pointer",padding:"8px 12px",fontFamily:"monospace",fontWeight:"bold"}}>← BACK</button>
                 <button onClick={finishSession} style={{background:"linear-gradient(135deg,#00d4aa,#00ff88)",border:"none",borderRadius:"8px",color:"#000",fontSize:"11px",fontWeight:"bold",cursor:"pointer",padding:"10px 16px",fontFamily:"monospace",letterSpacing:"1px"}}>FINISH ✓</button>
+              </div>
+              <div style={{marginBottom:"12px"}}>
+                <div style={{fontSize:"16px",fontWeight:"bold",color:WORKOUT_PLANS[activeSession.planKey].color}}>
+                  {WORKOUT_PLANS[activeSession.planKey].emoji} {activeSession.planName}
+                </div>
+                <div style={mutedText}>{Math.round((Date.now()-activeSession.startTime)/60000)} min in · {activeSession.exercises.filter(e=>e.sets.length>0).length}/{activeSession.exercises.length} done</div>
               </div>
 
               {/* Session progress bar */}
