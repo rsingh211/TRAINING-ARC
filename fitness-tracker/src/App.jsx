@@ -101,17 +101,6 @@ const WEEKLY_CHALLENGES=[
   {id:"wc8",label:"Fiber Week",desc:"Hit fiber target 5 days",icon:"🌾",xp:80,check:(logs)=>logs.filter(l=>(l.fiber||0)>=25).length>=5},
 ];
 
-const WEEKLY_CHALLENGES=[
-  {id:"wc1",label:"Step Master",desc:"Hit 10k steps 5 days this week",icon:"👟",xp:100,check:(logs)=>logs.filter(l=>l.steps>=10000).length>=5},
-  {id:"wc2",label:"Protein Streak",desc:"Hit 120g protein 5 days",icon:"💪",xp:100,check:(logs)=>logs.filter(l=>l.protein>=120).length>=5},
-  {id:"wc3",label:"Triple Threat",desc:"Gym 3x this week",icon:"🏋️",xp:150,check:(logs)=>logs.filter(l=>l.gym).length>=3},
-  {id:"wc4",label:"Hydration Run",desc:"8 glasses water 5 days",icon:"💧",xp:75,check:(logs)=>logs.filter(l=>l.water>=8).length>=5},
-  {id:"wc5",label:"Daily Logger",desc:"Log meals every day this week",icon:"📋",xp:75,check:(logs)=>logs.filter(l=>l.meals&&l.meals.length>0).length>=7},
-  {id:"wc6",label:"Sleep Streak",desc:"7+ hours sleep 5 days",icon:"😴",xp:75,check:(logs)=>logs.filter(l=>l.sleep>=7).length>=5},
-  {id:"wc7",label:"Home Warrior",desc:"2 home gym sessions this week",icon:"🏠",xp:80,check:(logs)=>logs.filter(l=>l.homeGym).length>=2},
-  {id:"wc8",label:"Fiber Week",desc:"Hit fiber target 5 days",icon:"🌾",xp:80,check:(logs)=>logs.filter(l=>(l.fiber||0)>=25).length>=5},
-];
-
 const ACHIEVEMENTS=[
   {id:"first_gym",label:"Iron Initiated",desc:"First gym session",icon:"🏋️",reward:"Title: Iron Trainee",check:s=>Object.values(s.logs).some(l=>l.gym)},
   {id:"steps_10k",label:"10K Club",desc:"10k steps in a day",icon:"👟",reward:"+5 Bonus XP per 10k day",check:s=>Object.values(s.logs).some(l=>l.steps>=10000)},
@@ -270,7 +259,6 @@ export default function FitnessTracker(){
   const [questsTab,setQuestsTab]=useState("missions");
   const [newChallenge,setNewChallenge]=useState({title:"",reward:"",days:30});
   const [showNewChallenge,setShowNewChallenge]=useState(false);
-  const [questsTab,setQuestsTab]=useState("missions");
   const [cardioInput,setCardioInput]=useState({type:"Walk",duration:"",calories:""});
   const [routineChecks,setRoutineChecks]=useState({});
   const [measureInput,setMeasureInput]=useState({waist:"",chest:"",arms:""});
