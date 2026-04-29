@@ -1,4 +1,3 @@
-import { loadData, saveData } from './supabase';
 import { useState, useEffect, useRef } from "react";
 
 const DAYS=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
@@ -89,6 +88,28 @@ const BOSS_CHALLENGES=[
   {id:"b3",name:"Nutrition Arc",icon:"🧬",desc:"120g+ protein 5 days this week",xp:350,reward:"💎 Nutrition Badge"},
   {id:"b4",name:"Step Legend",icon:"🌍",desc:"70,000 steps this week",xp:350,reward:"⚡ Step Legend Badge + Neon Theme"},
   {id:"b5",name:"The Monk",icon:"🧘",desc:"Water + sleep + protein every day this week",xp:500,reward:"👑 Monk Badge + Crimson Theme"},
+];
+
+const WEEKLY_CHALLENGES=[
+  {id:"wc1",label:"Step Master",desc:"Hit 10k steps 5 days this week",icon:"👟",xp:100,check:(logs)=>logs.filter(l=>l.steps>=10000).length>=5},
+  {id:"wc2",label:"Protein Streak",desc:"Hit 120g protein 5 days this week",icon:"💪",xp:100,check:(logs)=>logs.filter(l=>l.protein>=120).length>=5},
+  {id:"wc3",label:"Triple Threat",desc:"Gym 3x this week",icon:"🏋️",xp:150,check:(logs)=>logs.filter(l=>l.gym).length>=3},
+  {id:"wc4",label:"Hydration Run",desc:"8 glasses water 5 days",icon:"💧",xp:75,check:(logs)=>logs.filter(l=>l.water>=8).length>=5},
+  {id:"wc5",label:"Daily Logger",desc:"Log meals every day this week",icon:"📋",xp:75,check:(logs)=>logs.filter(l=>l.meals?.length>0).length>=7},
+  {id:"wc6",label:"Sleep Streak",desc:"7+ hours sleep 5 days",icon:"😴",xp:75,check:(logs)=>logs.filter(l=>l.sleep>=7).length>=5},
+  {id:"wc7",label:"Home Warrior",desc:"2 home gym sessions this week",icon:"🏠",xp:80,check:(logs)=>logs.filter(l=>l.homeGym).length>=2},
+  {id:"wc8",label:"Fiber Week",desc:"Hit fiber target 5 days",icon:"🌾",xp:80,check:(logs)=>logs.filter(l=>(l.fiber||0)>=25).length>=5},
+];
+
+const WEEKLY_CHALLENGES=[
+  {id:"wc1",label:"Step Master",desc:"Hit 10k steps 5 days this week",icon:"👟",xp:100,check:(logs)=>logs.filter(l=>l.steps>=10000).length>=5},
+  {id:"wc2",label:"Protein Streak",desc:"Hit 120g protein 5 days",icon:"💪",xp:100,check:(logs)=>logs.filter(l=>l.protein>=120).length>=5},
+  {id:"wc3",label:"Triple Threat",desc:"Gym 3x this week",icon:"🏋️",xp:150,check:(logs)=>logs.filter(l=>l.gym).length>=3},
+  {id:"wc4",label:"Hydration Run",desc:"8 glasses water 5 days",icon:"💧",xp:75,check:(logs)=>logs.filter(l=>l.water>=8).length>=5},
+  {id:"wc5",label:"Daily Logger",desc:"Log meals every day this week",icon:"📋",xp:75,check:(logs)=>logs.filter(l=>l.meals&&l.meals.length>0).length>=7},
+  {id:"wc6",label:"Sleep Streak",desc:"7+ hours sleep 5 days",icon:"😴",xp:75,check:(logs)=>logs.filter(l=>l.sleep>=7).length>=5},
+  {id:"wc7",label:"Home Warrior",desc:"2 home gym sessions this week",icon:"🏠",xp:80,check:(logs)=>logs.filter(l=>l.homeGym).length>=2},
+  {id:"wc8",label:"Fiber Week",desc:"Hit fiber target 5 days",icon:"🌾",xp:80,check:(logs)=>logs.filter(l=>(l.fiber||0)>=25).length>=5},
 ];
 
 const ACHIEVEMENTS=[
@@ -213,7 +234,7 @@ export default function FitnessTracker(){
     exercisePRs:{},completedChallenges:{},goalWeight:74,
     streakFreezes:1,missionsCompleted:0,routineCount:0,
     bossesDefeated:{},unlockedThemes:["dark","light"],
-    selectedMissions:[],missionDate:null,
+    selectedMissions:[],missionDate:null,realLifeChallenges:[],
     customRewards:[],claimedRewards:{},totalVolume:0,personalTrackers:{},weeklyReports:{},monthlyReports:{},
     sessionHistory:[],
   });
@@ -246,6 +267,10 @@ export default function FitnessTracker(){
   const [energyBoost,setEnergyBoost]=useState(0);
   const [calTrackerDate,setCalTrackerDate]=useState(null);
   const [reportView,setReportView]=useState("weekly");
+  const [questsTab,setQuestsTab]=useState("missions");
+  const [newChallenge,setNewChallenge]=useState({title:"",reward:"",days:30});
+  const [showNewChallenge,setShowNewChallenge]=useState(false);
+  const [questsTab,setQuestsTab]=useState("missions");
   const [cardioInput,setCardioInput]=useState({type:"Walk",duration:"",calories:""});
   const [routineChecks,setRoutineChecks]=useState({});
   const [measureInput,setMeasureInput]=useState({waist:"",chest:"",arms:""});
@@ -260,21 +285,10 @@ export default function FitnessTracker(){
   const T=THEMES[themeName]||THEMES.dark;
   const isLight=themeName==="light";
 
-useEffect(()=>{
-  loadData().then(saved=>{
-    if(saved){
-      setData(saved.data||{});
-      setThemeName(saved.theme||"dark");
-    }
-  });
-},[]);
-
-useEffect(()=>{
-  const timeout=setTimeout(()=>{
-    saveData(data,themeName);
-  },2000);
-  return()=>clearTimeout(timeout);
-},[data,themeName]);
+  useEffect(()=>{
+    try{const s=localStorage.getItem("ft_v5");if(s){const p=JSON.parse(s);setData(p.data||p);setThemeName(p.theme||"dark");}}catch(e){}
+  },[]);
+  useEffect(()=>{try{localStorage.setItem("ft_v5",JSON.stringify({data,theme:themeName}));}catch(e){}});
 
   // Level up detection
   useEffect(()=>{
@@ -1446,7 +1460,17 @@ useEffect(()=>{
       {/* ══ QUESTS ══ */}
       {tab==="quests"&&(
         <div>
-          <div style={cStyle}>
+          {/* Sub tabs */}
+          <div style={{display:"flex",gap:"3px",marginBottom:"12px",background:T.card,borderRadius:"8px",padding:"3px",border:`2px solid ${T.border}`}}>
+            {[["missions","⚡ MISSIONS"],["challenges","🎯 CHALLENGES"],["bosses","⚔️ BOSSES"],["classes","🎭 CLASSES"]].map(([v,l])=>(
+              <button key={v} onClick={()=>setQuestsTab(v)} style={{flex:1,padding:"7px 2px",borderRadius:"6px",border:"none",background:questsTab===v?ACCENT.steps:"transparent",color:questsTab===v?"#000":T.muted,fontSize:"9px",fontWeight:"bold",cursor:"pointer",letterSpacing:"1px",fontFamily:"monospace",whiteSpace:"nowrap"}}>
+                {l}
+              </button>
+            ))}
+          </div>
+
+          {/* MISSIONS */}
+          {questsTab==="missions"&&<div style={cStyle}>
             <div style={labelStyle}>⚡ DAILY MISSIONS — PICK 3</div>
             <div style={{...mutedText,marginBottom:"12px"}}>Complete all 3 selected = +50 BONUS XP · {selectedMissions.length}/3 selected</div>
             {dailyMissions.map(mission=>{
@@ -1481,69 +1505,206 @@ useEffect(()=>{
                 </div>
               );
             })}
-          </div>
+          </div>}
 
-          <div style={labelStyle}>⚔️ BOSS CHALLENGES</div>
-          {BOSS_CHALLENGES.map(boss=>{
-            const defeated=data.bossesDefeated?.[boss.id];
-            return(
-              <div key={boss.id} style={{...cStyle,border:`2px solid ${defeated?ACCENT.steps+"44":T.border}`}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-                  <div style={{flex:1}}>
-                    <div style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"4px"}}>
-                      <span style={{fontSize:"22px"}}>{boss.icon}</span>
-                      <div>
-                        <div style={{fontSize:"13px",fontWeight:"bold",color:defeated?ACCENT.steps:T.text}}>{boss.name}</div>
-                        <div style={mutedText}>{boss.desc}</div>
+          {/* WEEKLY CHALLENGES */}
+          {questsTab==="challenges"&&(
+            <div>
+              <div style={{...mutedText,marginBottom:"12px"}}>Weekly challenges reset every Monday. Complete for bonus XP.</div>
+              {(()=>{
+                const wDays=getWeekDays();
+                const wLogs=wDays.map(d=>data.logs[d.date]||{}).filter(l=>Object.keys(l).length>0);
+                const weekKey=getMonday(today);
+                return WEEKLY_CHALLENGES.map(ch=>{
+                  const claimed=data.completedChallenges?.[weekKey]?.[ch.id];
+                  const passed=ch.check(wLogs);
+                  return(
+                    <div key={ch.id} style={{...cStyle,border:`2px solid ${claimed?ACCENT.steps:passed?ACCENT.gym+"66":T.border}`,background:claimed?ACCENT.steps+"08":T.card}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                        <div style={{flex:1}}>
+                          <div style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"4px"}}>
+                            <span style={{fontSize:"20px"}}>{ch.icon}</span>
+                            <div>
+                              <div style={{fontSize:"13px",fontWeight:"bold",color:claimed?ACCENT.steps:passed?ACCENT.gym:T.text}}>{ch.label}</div>
+                              <div style={mutedText}>{ch.desc}</div>
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{textAlign:"right",marginLeft:"8px"}}>
+                          <div style={{fontSize:"13px",fontWeight:"bold",color:ACCENT.gym}}>+{ch.xp}XP</div>
+                          {claimed
+                            ?<div style={{fontSize:"10px",color:ACCENT.steps,marginTop:"4px",fontWeight:"bold"}}>✓ CLAIMED</div>
+                            :passed
+                              ?<button onClick={()=>{
+                                setData(prev=>({...prev,xp:prev.xp+ch.xp,
+                                  completedChallenges:{...prev.completedChallenges,
+                                    [weekKey]:{...(prev.completedChallenges?.[weekKey]||{}),[ch.id]:true}}}));
+                                showNotif("🎯 Challenge complete! +"+ch.xp+"XP");
+                              }} style={{background:ACCENT.gym+"22",border:`2px solid ${ACCENT.gym}44`,borderRadius:"5px",color:ACCENT.gym,fontSize:"9px",cursor:"pointer",padding:"4px 10px",marginTop:"4px",fontFamily:"monospace",fontWeight:"bold"}}>CLAIM</button>
+                              :<div style={{fontSize:"10px",color:T.muted,marginTop:"4px"}}>In progress...</div>
+                          }
+                        </div>
                       </div>
                     </div>
-                    <div style={{fontSize:"10px",color:ACCENT.gym,marginTop:"4px",fontWeight:"bold"}}>🎁 {boss.reward}</div>
-                  </div>
-                  <div style={{textAlign:"right",marginLeft:"8px"}}>
-                    <div style={{fontSize:"14px",fontWeight:"bold",color:ACCENT.gym}}>+{boss.xp}XP</div>
-                    {!defeated?(
-                      <button onClick={()=>defeatBoss(boss)} style={{background:ACCENT.boss+"22",border:`2px solid ${ACCENT.boss}44`,borderRadius:"5px",color:ACCENT.boss,fontSize:"9px",cursor:"pointer",padding:"4px 10px",marginTop:"6px",fontFamily:"monospace",fontWeight:"bold"}}>DEFEAT</button>
-                    ):<div style={{fontSize:"10px",color:ACCENT.steps,marginTop:"6px",fontWeight:"bold"}}>⚔️ SLAIN</div>}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+                  );
+                });
+              })()}
 
-          <div style={labelStyle}>🎭 CHARACTER CLASSES</div>
-          {CLASSES.map(cls=>{
-            const unlocked=cls.check(data);
-            return(
-              <div key={cls.id} style={{...cStyle,border:`2px solid ${unlocked?cls.color+"66":T.border}`,opacity:unlocked?1:0.6}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <div>
-                    <div style={{fontSize:"13px",fontWeight:"bold",color:unlocked?cls.color:T.text}}>{cls.icon} {cls.name}{unlocked&&" ✓"}</div>
-                    <div style={mutedText}>{cls.desc}</div>
-                    <div style={{fontSize:"10px",color:ACCENT.gym,marginTop:"4px",fontWeight:"bold"}}>🎁 {cls.reward}</div>
-                  </div>
-                  {unlocked&&<div style={{fontSize:"22px"}}>✅</div>}
-                </div>
+              {/* REAL LIFE CHALLENGES */}
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",margin:"16px 0 8px"}}>
+                <div style={labelStyle}>🔥 REAL LIFE CHALLENGES</div>
+                <button onClick={()=>setShowNewChallenge(!showNewChallenge)} style={{background:"none",border:`2px solid ${T.border}`,borderRadius:"6px",color:ACCENT.steps,fontSize:"10px",cursor:"pointer",padding:"4px 10px",fontFamily:"monospace",fontWeight:"bold"}}>
+                  {showNewChallenge?"CANCEL":"+ NEW"}
+                </button>
               </div>
-            );
-          })}
+              <div style={{...mutedText,marginBottom:"10px"}}>Set your own challenge, check in daily, earn your reward.</div>
 
-          {/* Focus timer */}
-          <div style={{...cStyle,border:`2px solid ${ACCENT.cardio}44`}}>
-            <div style={labelStyle}>🎵 STUDIO FOCUS TIMER</div>
-            {focusTimer!==null?(
-              <div style={{textAlign:"center",padding:"8px 0"}}>
-                <div style={{fontSize:"9px",color:focusMode==="work"?ACCENT.cardio:ACCENT.steps,letterSpacing:"3px",marginBottom:"4px",fontWeight:"bold"}}>{focusMode==="work"?"🎵 FOCUS":"☕ BREAK"}</div>
-                <div style={{fontSize:"46px",fontWeight:"bold",color:focusMode==="work"?ACCENT.cardio:ACCENT.steps,fontVariantNumeric:"tabular-nums"}}>{Math.floor(focusTimer/60)}:{String(focusTimer%60).padStart(2,"0")}</div>
-                <div style={{...mutedText,marginBottom:"8px"}}>Cycles: {focusCycles}</div>
-                <div style={{background:T.sub,borderRadius:"3px",height:"5px",overflow:"hidden",marginBottom:"10px",border:`1px solid ${T.border}`}}>
-                  <div style={{height:"100%",width:`${100-((focusTimer/(focusMode==="work"?25*60:5*60))*100)}%`,background:focusMode==="work"?ACCENT.cardio:ACCENT.steps,transition:"width 1s linear"}}/>
+              {showNewChallenge&&(
+                <div style={{...cStyle,border:`2px solid ${ACCENT.cal}44`}}>
+                  <div style={labelStyle}>CREATE CHALLENGE</div>
+                  <input value={newChallenge.title} onChange={e=>setNewChallenge(p=>({...p,title:e.target.value}))} placeholder="e.g. No junk food for 30 days" style={{...iStyle,marginBottom:"8px"}}/>
+                  <input value={newChallenge.reward} onChange={e=>setNewChallenge(p=>({...p,reward:e.target.value}))} placeholder="Reward when done (e.g. New Jordans)" style={{...iStyle,marginBottom:"8px"}}/>
+                  <div style={{display:"flex",gap:"8px",alignItems:"center",marginBottom:"8px",flexWrap:"wrap"}}>
+                    <span style={mutedText}>Duration:</span>
+                    {[7,14,21,30,60].map(d=>(
+                      <button key={d} onClick={()=>setNewChallenge(p=>({...p,days:d}))} style={{padding:"6px 12px",borderRadius:"6px",border:`2px solid ${newChallenge.days===d?ACCENT.cal:T.border}`,background:newChallenge.days===d?ACCENT.cal+"22":T.sub,color:newChallenge.days===d?ACCENT.cal:T.muted,fontSize:"11px",fontWeight:"bold",cursor:"pointer",fontFamily:"monospace"}}>
+                        {d}d
+                      </button>
+                    ))}
+                  </div>
+                  <button onClick={()=>{
+                    if(!newChallenge.title) return;
+                    const challenge={id:`rlc_${Date.now()}`,title:newChallenge.title,reward:newChallenge.reward,days:newChallenge.days,startDate:today,checkIns:[],completed:false};
+                    setData(prev=>({...prev,realLifeChallenges:[...(prev.realLifeChallenges||[]),challenge]}));
+                    setNewChallenge({title:"",reward:"",days:30});
+                    setShowNewChallenge(false);
+                    showNotif("🔥 Challenge started! You got this.");
+                  }} style={bStyle(ACCENT.cal)}>START CHALLENGE</button>
                 </div>
-                <button onClick={()=>{setFocusTimer(null);setFocusMode("work");}} style={{background:"none",border:`2px solid ${T.border}`,borderRadius:"6px",color:T.muted,fontSize:"10px",cursor:"pointer",padding:"6px 20px",fontFamily:"monospace",fontWeight:"bold"}}>STOP</button>
+              )}
+
+              {(data.realLifeChallenges||[]).length===0&&!showNewChallenge&&(
+                <div style={{...cStyle,textAlign:"center",padding:"24px"}}>
+                  <div style={{fontSize:"32px",marginBottom:"8px"}}>🎯</div>
+                  <div style={mutedText}>No active challenges yet</div>
+                  <div style={{...mutedText,marginTop:"4px"}}>Tap + NEW to create one</div>
+                </div>
+              )}
+
+              {[...(data.realLifeChallenges||[])].reverse().map(ch=>{
+                const start=new Date(ch.startDate);
+                const daysPassed=Math.floor((Date.now()-start.getTime())/(1000*60*60*24));
+                const progress=Math.min(((ch.checkIns||[]).length/ch.days)*100,100);
+                const checkedToday=(ch.checkIns||[]).includes(today);
+                const isComplete=(ch.checkIns||[]).length>=ch.days||ch.completed;
+                const daysLeft=Math.max(ch.days-daysPassed,0);
+                return(
+                  <div key={ch.id} style={{...cStyle,border:`2px solid ${isComplete?ACCENT.steps:checkedToday?ACCENT.gym+"66":T.border}`,background:isComplete?ACCENT.steps+"08":T.card}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"8px"}}>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:"13px",fontWeight:"bold",color:isComplete?ACCENT.steps:T.text}}>{ch.title}</div>
+                        {ch.reward&&<div style={{fontSize:"10px",color:ACCENT.reward,marginTop:"2px",fontWeight:"bold"}}>🎁 {ch.reward}</div>}
+                        <div style={mutedText}>{(ch.checkIns||[]).length}/{ch.days} days · {daysLeft}d left</div>
+                      </div>
+                      <div style={{marginLeft:"8px"}}>
+                        {isComplete
+                          ?<div style={{fontSize:"20px"}}>✅</div>
+                          :<button onClick={()=>{
+                            if(checkedToday) return;
+                            setData(prev=>({...prev,realLifeChallenges:(prev.realLifeChallenges||[]).map(c=>c.id===ch.id?{...c,checkIns:[...(c.checkIns||[]),today]}:c)}));
+                            showNotif("✓ Checked in! Keep going 💪");
+                          }} style={{background:checkedToday?ACCENT.gym+"22":ACCENT.gym,border:"none",borderRadius:"7px",color:"#000",fontSize:"10px",fontWeight:"bold",cursor:checkedToday?"default":"pointer",padding:"8px 12px",fontFamily:"monospace",whiteSpace:"nowrap"}}>
+                            {checkedToday?"✓ DONE":"CHECK IN"}
+                          </button>
+                        }
+                      </div>
+                    </div>
+                    <div style={{background:T.sub,borderRadius:"3px",height:"6px",overflow:"hidden",border:`1px solid ${T.border}`}}>
+                      <div style={{height:"100%",width:`${progress}%`,background:isComplete?"linear-gradient(90deg,#00d4aa,#00ff88)":ACCENT.gym,borderRadius:"3px",transition:"width 0.5s"}}/>
+                    </div>
+                    {isComplete&&!ch.completed&&(
+                      <button onClick={()=>{
+                        setData(prev=>({...prev,realLifeChallenges:(prev.realLifeChallenges||[]).map(c=>c.id===ch.id?{...c,completed:true}:c)}));
+                        showNotif("🏆 CHALLENGE COMPLETE! Claim your reward!");
+                      }} style={bStyle(ACCENT.steps)}>🏆 MARK COMPLETE + CLAIM REWARD</button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* BOSSES */}
+          {questsTab==="bosses"&&(
+            <div>
+              <div style={{...mutedText,marginBottom:"12px"}}>Defeat bosses for big XP and real rewards.</div>
+              {BOSS_CHALLENGES.map(boss=>{
+                const defeated=data.bossesDefeated?.[boss.id];
+                return(
+                  <div key={boss.id} style={{...cStyle,border:`2px solid ${defeated?ACCENT.steps+"44":T.border}`}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                      <div style={{flex:1}}>
+                        <div style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"4px"}}>
+                          <span style={{fontSize:"22px"}}>{boss.icon}</span>
+                          <div>
+                            <div style={{fontSize:"13px",fontWeight:"bold",color:defeated?ACCENT.steps:T.text}}>{boss.name}</div>
+                            <div style={mutedText}>{boss.desc}</div>
+                          </div>
+                        </div>
+                        <div style={{fontSize:"10px",color:ACCENT.gym,marginTop:"4px",fontWeight:"bold"}}>🎁 {boss.reward}</div>
+                      </div>
+                      <div style={{textAlign:"right",marginLeft:"8px"}}>
+                        <div style={{fontSize:"14px",fontWeight:"bold",color:ACCENT.gym}}>+{boss.xp}XP</div>
+                        {!defeated
+                          ?<button onClick={()=>defeatBoss(boss)} style={{background:ACCENT.boss+"22",border:`2px solid ${ACCENT.boss}44`,borderRadius:"5px",color:ACCENT.boss,fontSize:"9px",cursor:"pointer",padding:"4px 10px",marginTop:"6px",fontFamily:"monospace",fontWeight:"bold"}}>DEFEAT</button>
+                          :<div style={{fontSize:"10px",color:ACCENT.steps,marginTop:"6px",fontWeight:"bold"}}>⚔️ SLAIN</div>}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Focus timer lives here too */}
+              <div style={{...cStyle,border:`2px solid ${ACCENT.cardio}44`,marginTop:"4px"}}>
+                <div style={labelStyle}>🎵 STUDIO FOCUS TIMER</div>
+                {focusTimer!==null?(
+                  <div style={{textAlign:"center",padding:"8px 0"}}>
+                    <div style={{fontSize:"9px",color:focusMode==="work"?ACCENT.cardio:ACCENT.steps,letterSpacing:"3px",marginBottom:"4px",fontWeight:"bold"}}>{focusMode==="work"?"🎵 FOCUS":"☕ BREAK"}</div>
+                    <div style={{fontSize:"46px",fontWeight:"bold",color:focusMode==="work"?ACCENT.cardio:ACCENT.steps,fontVariantNumeric:"tabular-nums"}}>{Math.floor(focusTimer/60)}:{String(focusTimer%60).padStart(2,"0")}</div>
+                    <div style={{...mutedText,marginBottom:"8px"}}>Cycles: {focusCycles}</div>
+                    <div style={{background:T.sub,borderRadius:"3px",height:"5px",overflow:"hidden",marginBottom:"10px",border:`1px solid ${T.border}`}}>
+                      <div style={{height:"100%",width:`${100-((focusTimer/(focusMode==="work"?25*60:5*60))*100)}%`,background:focusMode==="work"?ACCENT.cardio:ACCENT.steps,transition:"width 1s linear"}}/>
+                    </div>
+                    <button onClick={()=>{setFocusTimer(null);setFocusMode("work");}} style={{background:"none",border:`2px solid ${T.border}`,borderRadius:"6px",color:T.muted,fontSize:"10px",cursor:"pointer",padding:"6px 20px",fontFamily:"monospace",fontWeight:"bold"}}>STOP</button>
+                  </div>
+                ):(
+                  <button onClick={()=>{setFocusMode("work");setFocusTimer(25*60);}} style={bStyle(ACCENT.cardio)}>START 25MIN FOCUS</button>
+                )}
               </div>
-            ):(
-              <button onClick={()=>{setFocusMode("work");setFocusTimer(25*60);}} style={bStyle(ACCENT.cardio)}>START 25MIN FOCUS</button>
-            )}
-          </div>
+            </div>
+          )}
+
+          {/* CLASSES */}
+          {questsTab==="classes"&&(
+            <div>
+              <div style={{...mutedText,marginBottom:"12px"}}>Unlock character classes by hitting milestones. Each gives real bonuses.</div>
+              {CLASSES.map(cls=>{
+                const unlocked=cls.check(data);
+                return(
+                  <div key={cls.id} style={{...cStyle,border:`2px solid ${unlocked?cls.color+"66":T.border}`,opacity:unlocked?1:0.6}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                      <div>
+                        <div style={{fontSize:"16px",fontWeight:"bold",color:unlocked?cls.color:T.text}}>{cls.icon} {cls.name}{unlocked&&" ✓"}</div>
+                        <div style={{...mutedText,marginTop:"3px"}}>{cls.desc}</div>
+                        <div style={{fontSize:"10px",color:ACCENT.gym,marginTop:"6px",fontWeight:"bold"}}>🎁 {cls.reward}</div>
+                      </div>
+                      <div style={{fontSize:"28px",marginLeft:"12px"}}>{unlocked?"✅":"🔒"}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
