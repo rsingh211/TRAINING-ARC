@@ -227,7 +227,7 @@ export default function FitnessTracker(){
     selectedMissions:[],missionDate:null,realLifeChallenges:[],
     customRewards:[],claimedRewards:{},totalVolume:0,personalTrackers:{},weeklyReports:{},monthlyReports:{},
     sessionHistory:[],
-    customPresets:[],
+    customPresets:[],hiddenPresets:[],
     calSettings:{maintenance:2200,deficit:500},
   });
   const [tab,setTab]=useState("dashboard");
@@ -640,7 +640,7 @@ export default function FitnessTracker(){
 
       {/* TABS */}
       <div style={{display:"flex",gap:"2px",marginBottom:"12px",background:T.card,borderRadius:"10px",padding:"3px",overflowX:"auto",border:`2px solid ${T.border}`}}>
-        {[["TODAY","dashboard"],["LOG","log"],["GYM","gym"],["QUESTS","quests"],["CHARTS","charts"],["CAL","calendar"],["REPORTS","reports"],["REWARDS","rewards"],["STATS","stats"]].map(([label,id])=>(
+        {[["TODAY","dashboard"],["LOG","log"],["GYM","gym"],["QUESTS","quests"],["CHARTS","charts"],["CAL","calendar"],["REPORTS","reports"],["REWARDS","rewards"],["STATS","stats"],["❓","help"]].map(([label,id])=>(
           <button key={id} onClick={()=>setTab(id)} style={{
             flex:"0 0 auto",padding:"7px 10px",borderRadius:"7px",border:"none",
             background:tab===id?ACCENT.steps:"transparent",
@@ -862,21 +862,19 @@ export default function FitnessTracker(){
                   <div>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
                       <div style={mutedText}>{PRESET_MEALS.length+(data.customPresets||[]).length}/20 presets</div>
-                      {(data.customPresets||[]).length>0&&(
-                        <button onClick={()=>setPresetEditMode(!presetEditMode)} style={{background:presetEditMode?ACCENT.protein+"22":"none",border:`2px solid ${presetEditMode?ACCENT.protein:T.border}`,borderRadius:"6px",color:presetEditMode?ACCENT.protein:T.muted,fontSize:"9px",cursor:"pointer",padding:"3px 10px",fontFamily:"monospace",fontWeight:"bold"}}>
-                          {presetEditMode?"DONE":"EDIT"}
-                        </button>
-                      )}
+                      <button onClick={()=>setPresetEditMode(!presetEditMode)} style={{background:presetEditMode?ACCENT.protein+"22":"none",border:`2px solid ${presetEditMode?ACCENT.protein:T.border}`,borderRadius:"6px",color:presetEditMode?ACCENT.protein:T.muted,fontSize:"9px",cursor:"pointer",padding:"3px 10px",fontFamily:"monospace",fontWeight:"bold"}}>
+                        {presetEditMode?"✓ DONE":"✏️ EDIT"}
+                      </button>
                     </div>
                     {presetEditMode&&(
-                      <div style={{...mutedText,marginBottom:"8px",color:ACCENT.protein,fontWeight:"bold"}}>Tap × to delete custom presets (★)</div>
+                      <div style={{...mutedText,marginBottom:"8px",color:ACCENT.protein,fontWeight:"bold"}}>Tap × next to any preset to remove it. Built-ins can be re-added by saving as custom.</div>
                     )}
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px"}}>
-                      {[...PRESET_MEALS,...(data.customPresets||[])].map((m,i)=>{
+                      {[...PRESET_MEALS.filter(m=>!(data.hiddenPresets||[]).includes(m.name)),...(data.customPresets||[])].map((m,i)=>{
                         const isCustom=i>=PRESET_MEALS.length;
                         return(
                           <div key={i} style={{position:"relative"}}>
-                            <button onClick={()=>{if(!presetEditMode)addMeal(m);}} style={{width:"100%",background:isCustom?ACCENT.protein+"11":T.sub,border:`2px solid ${isCustom?(presetEditMode?ACCENT.protein:ACCENT.protein+"44"):T.border}`,borderRadius:"8px",padding:"10px 8px",cursor:presetEditMode?"default":"pointer",textAlign:"left",fontFamily:"monospace",color:T.text,opacity:presetEditMode&&!isCustom?0.5:1}}>
+                            <button onClick={()=>{if(!presetEditMode)addMeal(m);}} style={{width:"100%",background:isCustom?ACCENT.protein+"11":T.sub,border:`2px solid ${presetEditMode?(isCustom?ACCENT.protein+"88":ACCENT.cal+"66"):isCustom?ACCENT.protein+"44":T.border}`,borderRadius:"8px",padding:"10px 8px",cursor:presetEditMode?"default":"pointer",textAlign:"left",fontFamily:"monospace",color:T.text}}>
                               <div style={{fontSize:"11px",marginBottom:"3px",fontWeight:isLight?"700":"500"}}>{m.name}{isCustom&&<span style={{color:ACCENT.protein,fontSize:"8px"}}> ★</span>}</div>
                               <div style={{fontSize:"9px"}}>
                                 <span style={{color:ACCENT.cal,fontWeight:"bold"}}>{m.calories}</span>
@@ -885,16 +883,20 @@ export default function FitnessTracker(){
                                 {m.fiber>0&&<><span style={{color:T.muted}}> · </span><span style={{color:ACCENT.fiber,fontWeight:"bold"}}>{m.fiber}f</span></>}
                               </div>
                             </button>
-                            {isCustom&&presetEditMode&&(
+                            {presetEditMode&&(
                               <button onClick={()=>{
-                                const ci=i-PRESET_MEALS.length;
-                                setData(prev=>({...prev,customPresets:(prev.customPresets||[]).filter((_,idx)=>idx!==ci)}));
-                                showNotif("🗑️ Preset removed");
+                                if(isCustom){
+                                  const ci=i-PRESET_MEALS.length;
+                                  setData(prev=>({...prev,customPresets:(prev.customPresets||[]).filter((_,idx)=>idx!==ci)}));
+                                } else {
+                                  setData(prev=>({...prev,hiddenPresets:[...(prev.hiddenPresets||[]),m.name]}));
+                                }
+                                showNotif("🗑️ Preset hidden");
                               }} style={{position:"absolute",top:"-6px",right:"-6px",width:"22px",height:"22px",borderRadius:"50%",background:ACCENT.protein,border:"none",color:"#000",fontSize:"13px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:"bold",lineHeight:1,zIndex:10}}>×</button>
                             )}
                           </div>
                         );
-                      })}
+                      }).filter(Boolean)}
                     </div>
                   </div>
                 ):(
@@ -2272,6 +2274,106 @@ export default function FitnessTracker(){
         </div>
       )}
 
+
+      {/* ══ HELP ══ */}
+      {tab==="help"&&(
+        <div>
+          {/* Streak Freeze section */}
+          <div style={{...cStyle,border:`2px solid ${ACCENT.water}44`}}>
+            <div style={labelStyle}>❄️ STREAK FREEZES — HOW THEY WORK</div>
+            <div style={{...mutedText,marginBottom:"12px",lineHeight:"1.8"}}>
+              A streak freeze protects your gym streak for one day you miss. Use it on TODAY tab when you can't train.
+            </div>
+            <div style={labelStyle}>HOW YOU EARN FREEZES</div>
+            {[
+              {label:"Start",desc:"You begin with 1 freeze",icon:"🎁",color:ACCENT.water},
+              {label:"5 day streak",desc:"Awarded when you hit 5 consecutive gym days",icon:"❄️",color:ACCENT.water},
+              {label:"7 day streak",desc:"2 more freezes at 7 days (Week Warrior achievement)",icon:"❄️❄️",color:ACCENT.water},
+              {label:"14 day streak",desc:"3 more freezes at 14 days (Fortnight Beast achievement)",icon:"❄️❄️❄️",color:ACCENT.steps},
+              {label:"Morning Routine",desc:"Every 5 completed morning routines = 1 freeze",icon:"🌅",color:ACCENT.mood},
+              {label:"Boss: The Plateau",desc:"Defeat The Plateau boss challenge = 3 freezes",icon:"🗻",color:ACCENT.boss},
+              {label:"Boss: Iron Week",desc:"Defeat Iron Week boss = 1 freeze",icon:"⚔️",color:ACCENT.boss},
+            ].map((item,i)=>(
+              <div key={i} style={{display:"flex",gap:"10px",alignItems:"flex-start",padding:"8px 0",borderBottom:`1px solid ${T.border}`}}>
+                <span style={{fontSize:"16px",flexShrink:0}}>{item.icon}</span>
+                <div>
+                  <div style={{fontSize:"11px",fontWeight:"bold",color:item.color}}>{item.label}</div>
+                  <div style={mutedText}>{item.desc}</div>
+                </div>
+              </div>
+            ))}
+            <div style={{...mutedText,marginTop:"10px",padding:"8px 10px",background:T.sub,borderRadius:"6px",border:`1px solid ${T.border}`,lineHeight:"1.7"}}>
+              💡 Streak resets happen at midnight if you didn't log a gym session OR use a freeze. The streak counter only tracks gym sessions — not meals or steps.
+            </div>
+          </div>
+
+          {/* What counts as streak */}
+          <div style={{...cStyle,border:`2px solid ${ACCENT.gym}44`}}>
+            <div style={labelStyle}>🔥 WHAT COUNTS AS A STREAK</div>
+            {[
+              {label:"✅ Counts",items:["Logging a gym session (any split)","Logging a home gym session","Using a streak freeze","Tapping LOG GYM SESSION on the TODAY tab"]},
+              {label:"❌ Does NOT count",items:["Logging meals only","Logging steps only","Logging water, sleep or mood","Completing missions without gym"]},
+            ].map((group,i)=>(
+              <div key={i} style={{marginBottom:"12px"}}>
+                <div style={{fontSize:"11px",fontWeight:"bold",color:i===0?ACCENT.steps:ACCENT.protein,marginBottom:"6px"}}>{group.label}</div>
+                {group.items.map((item,j)=>(
+                  <div key={j} style={{...mutedText,padding:"4px 0",borderBottom:`1px solid ${T.border}22`}}>· {item}</div>
+                ))}
+              </div>
+            ))}
+            <div style={{...mutedText,padding:"8px 10px",background:T.sub,borderRadius:"6px",border:`1px solid ${T.border}`,lineHeight:"1.7"}}>
+              💡 XP multiplier: 3+ day streak = 1.2x all XP. 7+ day streak = 1.5x all XP.
+            </div>
+          </div>
+
+          {/* Feature overview */}
+          <div style={cStyle}>
+            <div style={labelStyle}>📖 FEATURE GUIDE</div>
+            {[
+              {icon:"⚡",title:"Energy Score (TODAY)",desc:"0-100 score calculated from protein, steps, sleep, water, mood and training. Self-input buttons let you adjust ±10 based on how you actually feel. The suggestion below tells you if gym is a go or not."},
+              {icon:"🌾",title:"Fiber Reminder (TODAY)",desc:"Appears when your protein is high (80g+) but fiber is low. High protein diets need high fiber to stay regular and absorb properly. Target is dynamic — scales with your protein."},
+              {icon:"🔥",title:"Calorie Target (LOG → BODY)",desc:"Set your maintenance calories (TDEE) and your daily deficit. Your target = maintenance minus deficit. 500 cal deficit ≈ 0.5kg fat loss per week. Use tdeecalculator.net for your personal TDEE."},
+              {icon:"🏋️",title:"Gym Sessions (GYM tab)",desc:"Pick a split (Push/Pull/Legs/Full Body), log sets with weight and reps. PRs are auto-tracked. Rest timer starts automatically after each set. Warmup weights suggested based on your PR."},
+              {icon:"🏠",title:"Home Gym (GYM → HOME)",desc:"12 bodyweight exercises. Tap reps (25/50/75/100) for each, log the session. Calories burned estimated per exercise. Counts toward streak."},
+              {icon:"🎯",title:"Daily Missions (QUESTS → MISSIONS)",desc:"Pick 3 missions each day. Complete all 3 = +50 bonus XP. Missions refresh daily and are randomised from a pool of 12."},
+              {icon:"🔥",title:"Real Life Challenges (QUESTS → CHALLENGES)",desc:"Set your own challenge with a title, reward, and duration. Check in daily. Progress tracked with a bar. Mark complete to claim your reward."},
+              {icon:"📊",title:"Reports (REPORTS tab)",desc:"Weekly and monthly summaries auto-generated from your logs. Shows avg calories, protein, fiber, steps, gym days and deficit."},
+              {icon:"📅",title:"Calendar Trackers (CAL tab)",desc:"Tap any day to log: Barber/Beard trim, Reset Session, Rest Day, Cheat Meal, Great Sleep. Monthly counts shown at top. Goal: 2 barber visits per month."},
+              {icon:"🎁",title:"Real Life Rewards (REWARDS tab)",desc:"Milestone rewards unlock automatically when you hit sessions, weight loss or streak targets. Claim them as motivation. Add your own custom rewards too."},
+              {icon:"🍽️",title:"Meal Presets (LOG → MEALS)",desc:"Tap EDIT to remove any preset (built-ins get hidden, custom ones get deleted). Add new presets by tapping CUSTOM → filling details → checking Save as preset. 20 preset limit."},
+              {icon:"🎭",title:"Character Classes (QUESTS → CLASSES)",desc:"Unlock by hitting big milestones: 15 gym sessions, 5x 15k step days, 120g protein 10+ days, etc. Each class unlocks bonus themes and XP multipliers."},
+            ].map((f,i)=>(
+              <div key={i} style={{padding:"10px 0",borderBottom:`1px solid ${T.border}`}}>
+                <div style={{display:"flex",gap:"8px",alignItems:"flex-start"}}>
+                  <span style={{fontSize:"18px",flexShrink:0}}>{f.icon}</span>
+                  <div>
+                    <div style={{fontSize:"12px",fontWeight:"bold",color:T.text,marginBottom:"3px"}}>{f.title}</div>
+                    <div style={{...mutedText,lineHeight:"1.7"}}>{f.desc}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* XP guide */}
+          <div style={{...cStyle,border:`2px solid ${ACCENT.gym}44`}}>
+            <div style={labelStyle}>⭐ XP GUIDE</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"4px"}}>
+              {[
+                ["Log meal","10 XP"],["Log steps 7k+","30 XP"],["Log steps 10k+","50 XP"],
+                ["Gym session","75 XP"],["Home gym","40 XP"],["New PR","25 XP bonus"],
+                ["Log sleep 8h","20 XP"],["Log mood","5 XP"],["Mission claim","25-100 XP"],
+                ["Morning routine","10 XP/item"],["3+ streak","1.2x mult"],["7+ streak","1.5x mult"],
+              ].map(([action,xp],i)=>(
+                <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"5px 8px",background:T.sub,borderRadius:"5px",margin:"2px 0"}}>
+                  <span style={mutedText}>{action}</span>
+                  <span style={{fontSize:"10px",fontWeight:"bold",color:ACCENT.gym}}>{xp}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
       <style>{`
         @keyframes pop{from{transform:translateX(-50%) scale(0.8);opacity:0}to{transform:translateX(-50%) scale(1);opacity:1}}
         @keyframes bounce{from{transform:translateY(0)}to{transform:translateY(-12px)}}
