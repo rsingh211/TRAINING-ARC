@@ -1,3 +1,4 @@
+import { loadData, saveData } from './supabase';
 import { useState, useEffect, useRef } from "react";
 
 const DAYS=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
@@ -226,6 +227,8 @@ export default function FitnessTracker(){
     selectedMissions:[],missionDate:null,realLifeChallenges:[],
     customRewards:[],claimedRewards:{},totalVolume:0,personalTrackers:{},weeklyReports:{},monthlyReports:{},
     sessionHistory:[],
+    customPresets:[],
+    calSettings:{maintenance:2200,deficit:500},
   });
   const [tab,setTab]=useState("dashboard");
   const [subTab,setSubTab]=useState("meals");
@@ -236,7 +239,7 @@ export default function FitnessTracker(){
   const [prInput,setPrInput]=useState({});
   const [setLogInput,setSetLogInput]=useState({}); // {exName: {reps, weight}}
   const [sessionNote,setSessionNote]=useState("");
-  const [mealInput,setMealInput]=useState({name:"",calories:"",protein:"",sodium:"",fiber:""});
+  const [mealInput,setMealInput]=useState({name:"",calories:"",protein:"",sodium:"",fiber:"",saveAsPreset:false});
   const [customMeal,setCustomMeal]=useState(false);
   const [stepsInput,setStepsInput]=useState("");
   const [weightInput,setWeightInput]=useState("");
@@ -274,9 +277,14 @@ export default function FitnessTracker(){
   const isLight=themeName==="light";
 
   useEffect(()=>{
-    try{const s=localStorage.getItem("ft_v5");if(s){const p=JSON.parse(s);setData(p.data||p);setThemeName(p.theme||"dark");}}catch(e){}
+    loadData().then(saved=>{
+      if(saved){setData(prev=>({...prev,...(saved.data||{})}));setThemeName(saved.theme||"dark");}
+    });
   },[]);
-  useEffect(()=>{try{localStorage.setItem("ft_v5",JSON.stringify({data,theme:themeName}));}catch(e){}});
+  useEffect(()=>{
+    const timeout=setTimeout(()=>{saveData(data,themeName);},2000);
+    return()=>clearTimeout(timeout);
+  },[data,themeName]);
 
   // Level up detection
   useEffect(()=>{
@@ -325,7 +333,9 @@ export default function FitnessTracker(){
   const todayLog=data.logs[today]||{calories:0,protein:0,sodium:0,fiber:0,steps:0,gym:false,homeGym:false,meals:[],water:0,sleep:0,mood:0,hr:0,notes:"",cardioSessions:[],supplements:[],routine:[]};
   const levelInfo=getLevelInfo(data.xp);
   const xpMult=data.streak>=7?1.5:data.streak>=3?1.2:1.0;
-  const calTarget=todayLog.steps>=15000?2200:todayLog.steps>=10000?1900:1600;
+  const maintenance=data.calSettings?.maintenance||2200;
+  const deficitAmt=data.calSettings?.deficit||500;
+  const calTarget=Math.max(maintenance-deficitAmt,1200);
   const fiberTarget=Math.max(25,Math.round((todayLog.protein||0)*0.18));
   const energy=calcEnergy(todayLog,energyBoost);
   const dailyMissions=getDailyMissions(today);
@@ -828,17 +838,33 @@ export default function FitnessTracker(){
                   </button>
                 </div>
                 {!customMeal?(
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px"}}>
-                    {PRESET_MEALS.map((m,i)=>(
-                      <button key={i} onClick={()=>addMeal(m)} style={{background:T.sub,border:`2px solid ${T.border}`,borderRadius:"8px",padding:"10px 8px",cursor:"pointer",textAlign:"left",fontFamily:"monospace",color:T.text}}>
-                        <div style={{fontSize:"11px",marginBottom:"3px",fontWeight:isLight?"700":"500"}}>{m.name}</div>
-                        <div style={{fontSize:"9px"}}>
-                          <span style={{color:ACCENT.cal,fontWeight:"bold"}}>{m.calories}</span>
-                          <span style={{color:T.muted}}> · </span>
-                          <span style={{color:ACCENT.protein,fontWeight:"bold"}}>{m.protein}g</span>
-                        </div>
-                      </button>
-                    ))}
+                  <div>
+                    <div style={{...mutedText,marginBottom:"8px"}}>{PRESET_MEALS.length + (data.customPresets||[]).length}/20 presets · Long press to delete custom</div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px"}}>
+                      {[...PRESET_MEALS,...(data.customPresets||[])].map((m,i)=>{
+                        const isCustom=i>=PRESET_MEALS.length;
+                        return(
+                          <div key={i} style={{position:"relative"}}>
+                            <button onClick={()=>addMeal(m)} style={{width:"100%",background:isCustom?ACCENT.protein+"11":T.sub,border:`2px solid ${isCustom?ACCENT.protein+"44":T.border}`,borderRadius:"8px",padding:"10px 8px",cursor:"pointer",textAlign:"left",fontFamily:"monospace",color:T.text}}>
+                              <div style={{fontSize:"11px",marginBottom:"3px",fontWeight:isLight?"700":"500"}}>{m.name}{isCustom&&<span style={{color:ACCENT.protein,fontSize:"8px"}}> ★</span>}</div>
+                              <div style={{fontSize:"9px"}}>
+                                <span style={{color:ACCENT.cal,fontWeight:"bold"}}>{m.calories}</span>
+                                <span style={{color:T.muted}}> · </span>
+                                <span style={{color:ACCENT.protein,fontWeight:"bold"}}>{m.protein}g</span>
+                                {m.fiber>0&&<><span style={{color:T.muted}}> · </span><span style={{color:ACCENT.fiber,fontWeight:"bold"}}>{m.fiber}f</span></>}
+                              </div>
+                            </button>
+                            {isCustom&&(
+                              <button onClick={()=>{
+                                const ci=i-PRESET_MEALS.length;
+                                setData(prev=>({...prev,customPresets:(prev.customPresets||[]).filter((_,idx)=>idx!==ci)}));
+                                showNotif("🗑️ Preset removed");
+                              }} style={{position:"absolute",top:"-6px",right:"-6px",width:"18px",height:"18px",borderRadius:"50%",background:ACCENT.protein,border:"none",color:"#000",fontSize:"10px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:"bold",lineHeight:1}}>×</button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 ):(
                   <div>
@@ -849,7 +875,19 @@ export default function FitnessTracker(){
                       <input value={mealInput.fiber||""} onChange={e=>setMealInput(p=>({...p,fiber:e.target.value}))} placeholder="fiber g" type="number" style={iStyle}/>
                       <input value={mealInput.sodium} onChange={e=>setMealInput(p=>({...p,sodium:e.target.value}))} placeholder="sodium mg" type="number" style={iStyle}/>
                     </div>
-                    <button onClick={()=>addMeal(mealInput)} style={bStyle(ACCENT.cal)}>ADD MEAL</button>
+                    <div onClick={()=>setMealInput(p=>({...p,saveAsPreset:!p.saveAsPreset}))} style={{display:"flex",alignItems:"center",gap:"8px",marginTop:"10px",cursor:"pointer",padding:"8px 10px",borderRadius:"8px",background:mealInput.saveAsPreset?ACCENT.protein+"11":T.sub,border:`2px solid ${mealInput.saveAsPreset?ACCENT.protein+"66":T.border}`}}>
+                      <div style={{width:"18px",height:"18px",borderRadius:"4px",background:mealInput.saveAsPreset?ACCENT.protein:"transparent",border:`2px solid ${mealInput.saveAsPreset?ACCENT.protein:T.muted}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"11px",fontWeight:"bold",color:"#000",flexShrink:0}}>{mealInput.saveAsPreset?"✓":""}</div>
+                      <span style={{fontSize:"11px",color:mealInput.saveAsPreset?ACCENT.protein:T.muted,fontWeight:"bold"}}>Save as preset ★</span>
+                      {(PRESET_MEALS.length+(data.customPresets||[]).length)>=20&&<span style={{fontSize:"9px",color:ACCENT.protein}}>(limit reached)</span>}
+                    </div>
+                    <button onClick={()=>{
+                      if(!mealInput.name||!mealInput.calories) return;
+                      if(mealInput.saveAsPreset&&(PRESET_MEALS.length+(data.customPresets||[]).length)<20){
+                        const preset={name:mealInput.name,calories:parseInt(mealInput.calories)||0,protein:parseInt(mealInput.protein)||0,sodium:parseInt(mealInput.sodium)||0,fiber:parseInt(mealInput.fiber)||0};
+                        setData(prev=>({...prev,customPresets:[...(prev.customPresets||[]),preset]}));
+                      }
+                      addMeal(mealInput);
+                    }} style={bStyle(ACCENT.cal)}>ADD MEAL{mealInput.saveAsPreset?" + SAVE PRESET":""}</button>
                   </div>
                 )}
               </div>
@@ -857,7 +895,7 @@ export default function FitnessTracker(){
                 <div style={labelStyle}>LOG STEPS</div>
                 <div style={{display:"flex",gap:"8px"}}>
                   <input value={stepsInput} onChange={e=>setStepsInput(e.target.value)} placeholder="Steps today" type="number" style={{...iStyle,flex:1}}/>
-                  <button onClick={()=>{if(!stepsInput)return;const s=parseInt(stepsInput);const x=s>=10000?50:s>=7000?30:15;updateLog({steps:s},x,`+${Math.round(x*xpMult)}XP! ${s.toLocaleString()} 👟`);setStepsInput("");}}
+                  <button onClick={()=>{if(!stepsInput)return;const s=parseInt(stepsInput);const newSteps=(todayLog.steps||0)+s;const x=newSteps>=10000?50:newSteps>=7000?30:15;updateLog({steps:newSteps},x,`+${Math.round(x*xpMult)}XP! ${newSteps.toLocaleString()} 👟`);setStepsInput("");}}
                     style={{background:ACCENT.steps,border:"none",borderRadius:"7px",color:"#000",fontSize:"11px",fontWeight:"bold",cursor:"pointer",padding:"0 16px",fontFamily:"monospace"}}>LOG</button>
                 </div>
               </div>
@@ -925,6 +963,38 @@ export default function FitnessTracker(){
                   ))}
                 </div>
                 <button onClick={()=>{setData(prev=>({...prev,logs:{...prev.logs,[today]:{...(prev.logs[today]||{}),measurements:{...measureInput}}}}));showNotif("📏 Saved");setMeasureInput({waist:"",chest:"",arms:""});}} style={bStyle("#ffaa44")}>SAVE</button>
+              </div>
+              <div style={cStyle}>
+                <div style={labelStyle}>🔥 CALORIE SETTINGS</div>
+                <div style={{...mutedText,marginBottom:"12px"}}>
+                  Your target = Maintenance − Deficit. Current: {data.calSettings?.maintenance||2200} − {data.calSettings?.deficit||500} = <span style={{color:ACCENT.cal,fontWeight:"bold"}}>{Math.max((data.calSettings?.maintenance||2200)-(data.calSettings?.deficit||500),1200)} kcal/day</span>
+                </div>
+                <div style={{marginBottom:"8px"}}>
+                  <div style={labelStyle}>MAINTENANCE CALORIES (TDEE)</div>
+                  <div style={{...mutedText,marginBottom:"6px"}}>Your total daily energy expenditure — calories burned doing nothing + daily activity. Use a TDEE calculator online for accuracy. Average sedentary male ~2000–2400.</div>
+                  <div style={{display:"flex",gap:"8px"}}>
+                    <input
+                      defaultValue={data.calSettings?.maintenance||2200}
+                      onBlur={e=>{const v=parseInt(e.target.value);if(v>0)setData(prev=>({...prev,calSettings:{...prev.calSettings,maintenance:v}}));}}
+                      placeholder="e.g. 2200" type="number" style={{...iStyle,flex:1}}/>
+                  </div>
+                </div>
+                <div style={{marginBottom:"8px"}}>
+                  <div style={labelStyle}>DAILY DEFICIT</div>
+                  <div style={{...mutedText,marginBottom:"6px"}}>How much below maintenance to eat. 300–500 = moderate cut. 500–700 = aggressive. ~500 deficit = ~0.5kg/week loss.</div>
+                  <div style={{display:"flex",gap:"6px",flexWrap:"wrap",marginBottom:"8px"}}>
+                    {[250,350,500,600,750].map(d=>(
+                      <button key={d} onClick={()=>setData(prev=>({...prev,calSettings:{...prev.calSettings,deficit:d}}))} style={{padding:"6px 12px",borderRadius:"6px",border:`2px solid ${(data.calSettings?.deficit||500)===d?ACCENT.cal:T.border}`,background:(data.calSettings?.deficit||500)===d?ACCENT.cal+"22":T.sub,color:(data.calSettings?.deficit||500)===d?ACCENT.cal:T.muted,fontSize:"11px",fontWeight:"bold",cursor:"pointer",fontFamily:"monospace"}}>
+                        -{d}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div style={{background:T.sub,borderRadius:"8px",padding:"10px",border:`1px solid ${T.border}`}}>
+                  <div style={{...mutedText,fontWeight:"bold",color:ACCENT.steps}}>📊 At {data.calSettings?.deficit||500} cal deficit:</div>
+                  <div style={mutedText}>~{((data.calSettings?.deficit||500)*7/7700).toFixed(2)}kg lost per week</div>
+                  <div style={mutedText}>~{((data.calSettings?.deficit||500)*30/7700).toFixed(1)}kg lost per month</div>
+                </div>
               </div>
             </div>
           )}
