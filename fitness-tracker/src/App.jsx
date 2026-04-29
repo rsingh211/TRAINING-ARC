@@ -1,3 +1,4 @@
+import { loadData, saveData } from './supabase';
 import { useState, useEffect, useRef } from "react";
 
 const DAYS=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
@@ -259,10 +260,21 @@ export default function FitnessTracker(){
   const T=THEMES[themeName]||THEMES.dark;
   const isLight=themeName==="light";
 
-  useEffect(()=>{
-    try{const s=localStorage.getItem("ft_v5");if(s){const p=JSON.parse(s);setData(p.data||p);setThemeName(p.theme||"dark");}}catch(e){}
-  },[]);
-  useEffect(()=>{try{localStorage.setItem("ft_v5",JSON.stringify({data,theme:themeName}));}catch(e){}});
+useEffect(()=>{
+  loadData().then(saved=>{
+    if(saved){
+      setData(saved.data||{});
+      setThemeName(saved.theme||"dark");
+    }
+  });
+},[]);
+
+useEffect(()=>{
+  const timeout=setTimeout(()=>{
+    saveData(data,themeName);
+  },2000);
+  return()=>clearTimeout(timeout);
+},[data,themeName]);
 
   // Level up detection
   useEffect(()=>{
