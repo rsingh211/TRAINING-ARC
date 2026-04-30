@@ -281,17 +281,48 @@ export default function FitnessTracker(){
   const focusRef=useRef(null);
   const prevXP=useRef(0);
   const prevData=useRef(data);
+  const loadedFromDB=useRef(false);
 
   const T=THEMES[themeName]||THEMES.dark;
   const isLight=themeName==="light";
 
   useEffect(()=>{
+    // First: restore from localStorage instantly (permanent backup)
+    try{
+      const local=localStorage.getItem("rajvir_ft");
+      if(local){const p=JSON.parse(local);setData(p.data);setThemeName(p.theme||"dark");}
+    }catch(e){}
+    // Then: load from Supabase and deep merge
     loadData().then(saved=>{
-      if(saved){setData(prev=>({...prev,...(saved.data||{})}));setThemeName(saved.theme||"dark");}
+      if(saved&&saved.data){
+        setData(prev=>{
+          const dbData=saved.data;
+          // Prefer whichever logs object has more data for today
+          const prevToday=prev.logs?.[getToday()]||{};
+          const dbToday=dbData.logs?.[getToday()]||{};
+          const prevCalories=prevToday.calories||0;
+          const dbCalories=dbToday.calories||0;
+          // If local state has more logged today, keep it; otherwise use DB
+          const mergedLogs=prevCalories>=dbCalories
+            ?{...(dbData.logs||{}),[getToday()]:{...(dbToday||{}),...prevToday}}
+            :{...(dbData.logs||{})};
+          return{...dbData,...prev,logs:mergedLogs,
+            xp:Math.max(prev.xp||0,dbData.xp||0),
+            streak:Math.max(prev.streak||0,dbData.streak||0),
+          };
+        });
+        setThemeName(saved.theme||"dark");
+      }
+      loadedFromDB.current=true;
     });
   },[]);
+
   useEffect(()=>{
-    const timeout=setTimeout(()=>{saveData(data,themeName);},2000);
+    // Always save to localStorage immediately (permanent backup)
+    try{localStorage.setItem("rajvir_ft",JSON.stringify({data,theme:themeName}));}catch(e){}
+    if(!loadedFromDB.current) return;
+    // Save to Supabase with short debounce
+    const timeout=setTimeout(()=>{saveData(data,themeName);},800);
     return()=>clearTimeout(timeout);
   },[data,themeName]);
 
@@ -372,7 +403,7 @@ export default function FitnessTracker(){
 
   const updateLog=(updates,xpGain=0,notifMsg=null)=>{
     setData(prev=>{
-      const prevLog=prev.logs[today]||{calories:0,protein:0,sodium:0,steps:0,gym:false,meals:[],water:0,sleep:0,mood:0,hr:0,notes:"",cardioSessions:[],supplements:[],routine:[]};
+      const prevLog=prev.logs[today]||{calories:0,protein:0,sodium:0,fiber:0,steps:0,gym:false,homeGym:false,meals:[],water:0,sleep:0,mood:0,hr:0,notes:"",cardioSessions:[],supplements:[],routine:[]};
       let streak=prev.streak;
       if(updates.gym&&!prevLog.gym){
         const yd=new Date();yd.setDate(yd.getDate()-1);const yk=yd.toISOString().split("T")[0];

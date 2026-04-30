@@ -8,25 +8,37 @@ export const supabase = createClient(supabaseUrl, supabaseKey)
 const USER_ID = 'rajvir'
 
 export async function loadData() {
-  const { data, error } = await supabase
-    .from('fitness_data')
-    .select('data, theme')
-    .eq('user_id', USER_ID)
-    .single()
-
-  if (error || !data) return null
-  return { data: data.data, theme: data.theme }
+  try {
+    const { data, error } = await supabase
+      .from('fitness_data')
+      .select('data, theme')
+      .eq('user_id', USER_ID)
+      .single()
+    if (error || !data) return null
+    return { data: data.data, theme: data.theme }
+  } catch(e) {
+    console.error('Load error:', e)
+    return null
+  }
 }
 
 export async function saveData(data, theme) {
-  const { error } = await supabase
-    .from('fitness_data')
-    .upsert({
-      user_id: USER_ID,
-      data: data,
-      theme: theme,
-      updated_at: new Date().toISOString()
-    }, { onConflict: 'user_id' })
-
-  if (error) console.error('Save error:', error)
+  try {
+    const { error } = await supabase
+      .from('fitness_data')
+      .upsert({
+        user_id: USER_ID,
+        data: data,
+        theme: theme,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'user_id' })
+    if (error) {
+      console.error('Save error:', error)
+      return false
+    }
+    return true
+  } catch(e) {
+    console.error('Save exception:', e)
+    return false
+  }
 }
