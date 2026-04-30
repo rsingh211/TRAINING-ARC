@@ -665,7 +665,7 @@ export default function FitnessTracker(){
               padding:"5px 12px",fontSize:"11px",fontWeight:"bold",color:"#000",letterSpacing:"1px"}}>
               LVL {levelInfo.level+1} · {levelInfo.name.toUpperCase()}
             </div>
-            <div style={{...mutedText}}>{data.xp.toLocaleString()} XP{xpMult>1&&<span style={{color:ACCENT.gym}}> · 🔥{xpMult}x</span>}</div>
+            <div style={{...mutedText}}>{(data.xp||0).toLocaleString()} XP{xpMult>1&&<span style={{color:ACCENT.gym}}> · 🔥{xpMult}x</span>}</div>
           </div>
         </div>
         <div style={{background:T.sub,borderRadius:"3px",height:"5px",overflow:"hidden",marginBottom:"6px",border:`1px solid ${T.border}`}}>
@@ -778,8 +778,8 @@ export default function FitnessTracker(){
           {/* Cal + Protein big cards */}
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px",marginBottom:"10px"}}>
             {[
-              {label:"CALORIES",current:todayLog.calories,target:calTarget,color:ACCENT.cal,unit:"kcal"},
-              {label:"PROTEIN",current:todayLog.protein,target:120,color:ACCENT.protein,unit:"g"},
+              {label:"CALORIES",current:todayLog.calories||0,target:calTarget,color:ACCENT.cal,unit:"kcal"},
+              {label:"PROTEIN",current:todayLog.protein||0,target:120,color:ACCENT.protein,unit:"g"},
             ].map(s=>(
               <div key={s.label} style={cStyle}>
                 <div style={labelStyle}>{s.label}</div>
@@ -796,7 +796,7 @@ export default function FitnessTracker(){
 
           {/* Other metrics */}
           {[
-            {label:"STEPS",current:todayLog.steps,target:10000,color:ACCENT.steps,unit:"",sub:todayLog.steps>=10000?"✓ 10K DONE!":"Need "+(Math.max(0,10000-todayLog.steps)).toLocaleString()+" more"},
+            {label:"STEPS",current:todayLog.steps||0,target:10000,color:ACCENT.steps,unit:"",sub:todayLog.steps>=10000?"✓ 10K DONE!":"Need "+(Math.max(0,10000-(todayLog.steps||0))).toLocaleString()+" more"},
             {label:"FIBER",current:todayLog.fiber||0,target:fiberTarget,color:ACCENT.fiber,unit:"g",sub:(todayLog.fiber||0)>=fiberTarget?"✓ Fiber target hit":"Need "+(Math.max(0,fiberTarget-(todayLog.fiber||0)))+"g more"},
             {label:"WATER",current:todayLog.water||0,target:8,color:ACCENT.water,unit:" glasses",sub:`${(todayLog.water||0)*250}ml of 2000ml`},
             {label:"SODIUM",current:todayLog.sodium||0,target:2300,color:"#ffaa44",unit:"mg",sub:(todayLog.sodium||0)>2300?"⚠️ Over limit":"✓ Within range"},
@@ -804,7 +804,7 @@ export default function FitnessTracker(){
             <div key={s.label} style={cStyle}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",marginBottom:"6px"}}>
                 <div><div style={labelStyle}>{s.label}</div>
-                  <div style={valueStyle(s.color)}>{s.current.toLocaleString()}<span style={{fontSize:"11px"}}>{s.unit}</span></div>
+                  <div style={valueStyle(s.color)}>{(s.current||0).toLocaleString()}<span style={{fontSize:"11px"}}>{s.unit}</span></div>
                 </div>
                 <div style={{fontSize:"14px",fontWeight:"bold",color:pct(s.current,s.target)>=100?ACCENT.steps:T.muted}}>{Math.round(pct(s.current,s.target))}%</div>
               </div>
@@ -980,7 +980,7 @@ export default function FitnessTracker(){
                 <div style={labelStyle}>LOG STEPS</div>
                 <div style={{display:"flex",gap:"8px"}}>
                   <input value={stepsInput} onChange={e=>setStepsInput(e.target.value)} placeholder="Steps today" type="number" style={{...iStyle,flex:1}}/>
-                  <button onClick={()=>{if(!stepsInput)return;const s=parseInt(stepsInput);const newSteps=(todayLog.steps||0)+s;const x=newSteps>=10000?50:newSteps>=7000?30:15;updateLog({steps:newSteps},x,`+${Math.round(x*xpMult)}XP! ${newSteps.toLocaleString()} 👟`);setStepsInput("");}}
+                  <button onClick={()=>{if(!stepsInput)return;const s=parseInt(stepsInput);const newSteps=(todayLog.steps||0)+s;const x=newSteps>=10000?50:newSteps>=7000?30:15;updateLog({steps:newSteps},x,`+${Math.round(x*xpMult)}XP! ${(newSteps||0).toLocaleString()} 👟`);setStepsInput("");}}
                     style={{background:ACCENT.steps,border:"none",borderRadius:"7px",color:"#000",fontSize:"11px",fontWeight:"bold",cursor:"pointer",padding:"0 16px",fontFamily:"monospace"}}>LOG</button>
                 </div>
               </div>
@@ -1424,7 +1424,7 @@ export default function FitnessTracker(){
                           </div>
                         ))}
                         <div style={{background:T.sub,border:`1px solid ${T.border}`,borderRadius:"5px",padding:"4px 8px",fontSize:"10px",color:T.muted,fontWeight:"bold"}}>
-                          {ex.sets.reduce((a,s)=>a+(s.weight||0)*(parseInt(s.reps)||0),0).toLocaleString()} vol
+                          {(ex.sets.reduce((a,s)=>a+(s.weight||0)*(parseInt(s.reps)||0),0)||0).toLocaleString()} vol
                         </div>
                       </div>
                     )}
@@ -1890,7 +1890,7 @@ export default function FitnessTracker(){
             <div style={{display:"flex",justifyContent:"space-between",marginBottom:"10px"}}>
               <div>
                 <div style={{fontSize:"24px",fontWeight:"bold",color:weekLogs.reduce((a,{log})=>{if(!log?.calories)return a;const burn=1950+(log.steps>=15000?680:log.steps>=10000?510:log.steps>=5000?210:100)+(log.gym?350:0);return a+(burn-(log.calories||0));},0)>0?ACCENT.steps:ACCENT.protein}}>
-                  {(()=>{const d=weekLogs.reduce((a,{log})=>{if(!log?.calories)return a;const burn=1950+(log.steps>=15000?680:log.steps>=10000?510:log.steps>=5000?210:100)+(log.gym?350:0);return a+(burn-(log.calories||0));},0);return(d>0?"+":"")+d.toLocaleString();})()}
+                  {(()=>{const d=weekLogs.reduce((a,{log})=>{if(!log?.calories)return a;const burn=1950+(log.steps>=15000?680:log.steps>=10000?510:log.steps>=5000?210:100)+(log.gym?350:0);return a+(burn-(log.calories||0));},0);return(d>0?"+":"")+(d||0).toLocaleString();})()}
                 </div>
                 <div style={mutedText}>kcal deficit this week</div>
               </div>
@@ -2100,7 +2100,7 @@ export default function FitnessTracker(){
                     <div style={{...cStyle,border:`2px solid ${ACCENT.steps}44`}}>
                       <div style={{display:"flex",justifyContent:"space-between",marginBottom:"10px"}}>
                         <div><div style={{fontSize:"13px",fontWeight:"bold"}}>Week of {new Date(wk).toLocaleDateString("en-CA",{month:"short",day:"numeric"})}</div><div style={mutedText}>{wLogs.length} days logged</div></div>
-                        <div style={{textAlign:"right"}}><div style={{fontSize:"14px",fontWeight:"bold",color:deficit>0?ACCENT.steps:ACCENT.protein}}>{deficit>0?"+":""}{deficit.toLocaleString()}</div><div style={mutedText}>kcal deficit</div></div>
+                        <div style={{textAlign:"right"}}><div style={{fontSize:"14px",fontWeight:"bold",color:deficit>0?ACCENT.steps:ACCENT.protein}}>{deficit>0?"+":""}{(deficit||0).toLocaleString()}</div><div style={mutedText}>kcal deficit</div></div>
                       </div>
                       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"6px"}}>
                         {[{l:"AVG CAL",v:avgCal,c:ACCENT.cal},{l:"AVG PROT",v:avgProt+"g",c:ACCENT.protein},{l:"AVG FIBER",v:avgFiber+"g",c:ACCENT.fiber},{l:"AVG STEPS",v:avgSteps>=1000?Math.round(avgSteps/100)/10+"k":avgSteps,c:ACCENT.steps},{l:"GYM DAYS",v:gymDays+"/7",c:ACCENT.gym},{l:"HOME DAYS",v:homeDays+"/7",c:ACCENT.home}].map(s=>(
