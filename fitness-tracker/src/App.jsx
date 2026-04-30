@@ -287,41 +287,55 @@ export default function FitnessTracker(){
   const isLight=themeName==="light";
 
   useEffect(()=>{
-    // First: restore from localStorage instantly (permanent backup)
+    const defaultData={logs:{},weightLog:{},xp:0,streak:0,lastGymDate:null,exercisePRs:{},completedChallenges:{},goalWeight:74,streakFreezes:1,missionsCompleted:0,routineCount:0,bossesDefeated:{},unlockedThemes:["dark","light"],selectedMissions:[],missionDate:null,customRewards:[],claimedRewards:{},totalVolume:0,personalTrackers:{},weeklyReports:{},monthlyReports:{},sessionHistory:[],customPresets:[],deletedPresets:[],calSettings:{maintenance:2600,deficit:500},realLifeChallenges:[]};
+    const merge=(base,incoming)=>{
+      if(!incoming||typeof incoming!=="object") return base;
+      return{...base,...incoming,logs:{...(base.logs||{}),...(incoming.logs||{})}};
+    };
+    // Step 1: load localStorage first (instant)
+    let localData=null;
     try{
-      const local=localStorage.getItem("rajvir_ft");
-      if(local){const p=JSON.parse(local);setData(p.data);setThemeName(p.theme||"dark");}
-    }catch(e){}
-    // Then: load from Supabase and deep merge
+      const raw=localStorage.getItem("rajvir_ft");
+      if(raw){
+        const parsed=JSON.parse(raw);
+        if(parsed&&parsed.data&&typeof parsed.data==="object"){
+          localData=parsed;
+          setData(merge(defaultData,parsed.data));
+          setThemeName(parsed.theme||"dark");
+        }
+      }
+    }catch(e){console.warn("localStorage load failed",e);}
+    // Step 2: load Supabase, smart merge
     loadData().then(saved=>{
-      if(saved&&saved.data){
+      if(saved&&saved.data&&typeof saved.data==="object"){
         setData(prev=>{
-          const dbData=saved.data;
-          // Prefer whichever logs object has more data for today
-          const prevToday=prev.logs?.[getToday()]||{};
-          const dbToday=dbData.logs?.[getToday()]||{};
-          const prevCalories=prevToday.calories||0;
-          const dbCalories=dbToday.calories||0;
-          // If local state has more logged today, keep it; otherwise use DB
-          const mergedLogs=prevCalories>=dbCalories
-            ?{...(dbData.logs||{}),[getToday()]:{...(dbToday||{}),...prevToday}}
-            :{...(dbData.logs||{})};
-          return{...dbData,...prev,logs:mergedLogs,
-            xp:Math.max(prev.xp||0,dbData.xp||0),
-            streak:Math.max(prev.streak||0,dbData.streak||0),
+          const today=getToday();
+          const prevCal=(prev.logs?.[today]?.calories)||0;
+          const dbCal=(saved.data.logs?.[today]?.calories)||0;
+          const winnerToday=prevCal>=dbCal
+            ?{...(saved.data.logs?.[today]||{}),...(prev.logs?.[today]||{})}
+            :{...(prev.logs?.[today]||{}),...(saved.data.logs?.[today]||{})};
+          const mergedLogs={...(saved.data.logs||{}),...(prev.logs||{}),[today]:winnerToday};
+          return{...merge(defaultData,saved.data),...merge(defaultData,prev),
+            logs:mergedLogs,
+            xp:Math.max(prev.xp||0,saved.data.xp||0),
+            streak:Math.max(prev.streak||0,saved.data.streak||0),
+            customPresets:[...(saved.data.customPresets||[]),...(prev.customPresets||[]).filter(p=>!(saved.data.customPresets||[]).some(s=>s.name===p.name))],
           };
         });
         setThemeName(saved.theme||"dark");
       }
       loadedFromDB.current=true;
+    }).catch(e=>{
+      console.warn("Supabase load failed",e);
+      loadedFromDB.current=true;
     });
   },[]);
 
   useEffect(()=>{
-    // Always save to localStorage immediately (permanent backup)
+    // Save to localStorage immediately on every change
     try{localStorage.setItem("rajvir_ft",JSON.stringify({data,theme:themeName}));}catch(e){}
     if(!loadedFromDB.current) return;
-    // Save to Supabase with short debounce
     const timeout=setTimeout(()=>{saveData(data,themeName);},800);
     return()=>clearTimeout(timeout);
   },[data,themeName]);
