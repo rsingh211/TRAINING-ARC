@@ -398,7 +398,7 @@ export default function FitnessTracker(){
   const startWeight=weightEntries[0]?.[1]||79.4;
   const currentWeight=weightEntries[weightEntries.length-1]?.[1]||startWeight;
   const lostWeight=parseFloat((startWeight-currentWeight).toFixed(1));
-  const goalProgress=Math.min(Math.max(((startWeight-currentWeight)/(startWeight-(data.goalWeight||74)))*100,0),100);
+  const goalDiff=startWeight-(data.goalWeight||74);const goalProgress=goalDiff<=0?0:Math.min(Math.max(((startWeight-currentWeight)/goalDiff)*100,0),100);
   const weekDays=getWeekDays();
   const weekLogs=weekDays.map(d=>({...d,log:data.logs[d.date]||null}));
   const weekGymCount=weekLogs.filter(d=>d.log?.gym).length;
