@@ -763,12 +763,12 @@ export default function FitnessTracker(){
                 <div style={{fontSize:"14px",fontWeight:"bold",color:todayLog.calories>0?ACCENT.steps:T.muted}}>
                   {todayLog.calories>0?(pct(todayLog.protein,120)>=100&&pct(todayLog.calories,calTarget)>=80?"✓ ON TRACK":"📊 IN PROGRESS"):"No data yet"}
                 </div>
-                <div style={mutedText}>{Math.max(calTarget-todayLog.calories,0)} cal left · {Math.max(120-todayLog.protein,0)}g protein left</div>
+                <div style={mutedText}>{Math.max(calTarget-(todayLog.calories||0),0)} cal left · {Math.max(120-(todayLog.protein||0),0)}g protein left</div>
               </div>
               <div style={{textAlign:"right"}}>
                 <div style={labelStyle}>BURN TODAY</div>
                 <div style={{fontSize:"20px",fontWeight:"bold",color:ACCENT.cal}}>
-                  {(1950+(todayLog.steps>=15000?680:todayLog.steps>=10000?510:todayLog.steps>=5000?210:100)+(todayLog.gym?350:0)).toLocaleString()}
+                  {(1950+((todayLog.steps||0)>=15000?680:(todayLog.steps||0)>=10000?510:(todayLog.steps||0)>=5000?210:100)+(todayLog.gym?350:0)).toLocaleString()}
                 </div>
                 <div style={mutedText}>kcal burned</div>
               </div>
