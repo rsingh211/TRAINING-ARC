@@ -351,7 +351,7 @@ export default function FitnessTracker(){
   // Check real life rewards unlock
   useEffect(()=>{
     const totalSessions=Object.values(data.logs).filter(l=>l.gym).length;
-    const weightLost=lostWeight;
+    const weightEntries2=Object.entries(data.weightLog||{}).sort((a,b)=>a[0].localeCompare(b[0]));const startW=weightEntries2[0]?.[1]||79.4;const currW=weightEntries2[weightEntries2.length-1]?.[1]||startW;const weightLost=parseFloat((startW-currW).toFixed(1));
     const allRewards=[...SUGGESTED_REWARDS,...(data.customRewards||[])];
     allRewards.forEach(r=>{
       if(data.claimedRewards?.[r.id]) return;
